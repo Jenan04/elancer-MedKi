@@ -1,0 +1,73 @@
+version: '3.8'
+
+networks:
+  medki-network:
+    driver: bridge
+
+volumes:
+  postgres_data:      
+
+services: 
+  frontend: 
+    build: ./FE
+    container_name: medki-FE
+    ports: 
+      - '3000:3000'
+    networks:
+      - medki-network  
+    volumes: 
+      - ./FE:/app
+      - /app/node_modules
+      - /app/.next 
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+
+  backend:
+    build: ./BE
+    container_name: medki-BE
+    # ports: 
+    #   - '8000:8000'
+    networks:
+      - medki-network
+    volumes: 
+      - ./BE:/var/www
+    # depends_on:
+    #   - database  
+    depends_on:
+      database:
+        condition: service_healthy 
+
+  database:
+    image: postgres:15
+    container_name: medki-db
+    restart: always
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    networks:
+      - medki-network  
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  nginx:
+    image: nginx:alpine
+    container_name: medki_nginx
+    ports:
+      - "8000:80"
+    networks:
+      - medki-network  
+    volumes:
+      - ./BE:/var/www
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+
