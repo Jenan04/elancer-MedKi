@@ -9,10 +9,15 @@ volumes:
 
 services: 
   frontend: 
-    build: ./FE
+    build: 
+      context: ./FE
+      network: host
     container_name: medki-FE
     ports: 
       - '3000:3000'
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4   
     networks:
       - medki-network  
     volumes: 
@@ -21,6 +26,7 @@ services:
       - /app/.next 
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+     
 
   backend:
     build: ./BE
