@@ -8,6 +8,7 @@ import { SignUpForm } from "./SignUpForm";
 import { OtpVerification } from "./OtpVerification";
 import { ViewTransition } from "./ViewTransition";
 import type { AuthView } from "./types";
+import Cookies from 'js-cookie';
 
 const COPY: Record<AuthView, { eyebrow: string; title: string; subtitle: string }> = {
   "sign-in": {
@@ -36,6 +37,8 @@ function AuthFlowInner() {
     params.get("view") === "sign-up" ? "sign-up" : "sign-in"
   );
   const [pendingEmail, setPendingEmail] = useState("");
+  const [error, setError] = useState<string | null>(null); // لإدارة الأخطاء وعرضها إن لزم الأمر
+  const [isLoading, setIsLoading] = useState(false);
 
   // const copy = COPY[view];
 
@@ -46,34 +49,141 @@ function AuthFlowInner() {
     // OTP has no dedicated URL — state only
   }
 
-  async function handleSignIn(data: { email: string; password: string }) {
-    // TODO: wire to your auth API
-    console.log("sign in", data);
-  }
+  const handleAuthSuccess = (token: string, user: any) => {
+    Cookies.set("medki_token", token, { expires: 7 }); 
+   localStorage.setItem("user_info", JSON.stringify(user));
+    router.push("/dashboard"); 
+    // window.location.href = "/dashboard";
+  };
 
-  async function handleSignUp(data: {
-    name: string;
-    email: string;
-    password: string;
-  }) {
-    // TODO: wire to your auth API — create account, then send OTP
-    console.log("sign up", data);
-    setPendingEmail(data.email);
-    setView("otp");
-  }
+async function handleSignIn(data: { email: string; password: string }) {
+  setIsLoading(true);
+  setError(null);
+  
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
 
-  async function handleVerify(code: string) {
-    // TODO: wire to your auth API
-    console.log("verify", code);
-    if (code !== "000000") {
-      // simulate rejection for any code other than the demo value
-      // remove this check once wired to a real endpoint
+    const resData = await response.json();
+
+    if (response.status === 403 && resData.requires_verification) {
+      setPendingEmail(resData.email);
+      setView("otp");                  
+      return;
     }
+
+    if (!response.ok) {
+      throw new Error(resData.message || "Invalid email or password");
+    }
+
+    handleAuthSuccess(resData.access_token, resData.user);
+
+  } catch (err: any) {
+    setError(err.message);
+    console.error("Sign in error:", err);
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+  async function handleSignUp(data: { name: string; email: string; password: string }) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(resData.message || "Registration failed");
+      }
+
+      setPendingEmail(data.email);
+      
+      setView("otp");
+      
+
+    } catch (err: any) {
+      setError(err.message);
+      console.error("Sign up error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+  async function handleVerify(code: string) {
+    setIsLoading(true);
+  setError(null);
+  
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/verify-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        email: pendingEmail,
+        otp: code
+      }),
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(resData.message || "كود التحقق غير صحيح أو انتهت صلاحيته");
+    }
+
+    handleAuthSuccess(resData.access_token, resData.user);
+
+  } catch (err: any) {
+    setError(err.message);
+    console.error("OTP Verification error:", err);
+  } finally {
+    setIsLoading(false);
+  }
   }
 
   async function handleResend() {
-    // TODO: wire to your auth API
-    console.log("resend code to", pendingEmail);
+    setIsLoading(true);
+  setError(null);
+  
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/resend-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({ email: pendingEmail }), 
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(resData.message || "Failed to resend OTP");
+    }
+
+    alert(resData.message || "New OTP sent successfully!");
+
+  } catch (err: any) {
+    setError(err.message);
+    console.error("Resend OTP error:", err);
+  } finally {
+    setIsLoading(false);
+  }
   }
 
   return (
@@ -115,6 +225,7 @@ function AuthFlowInner() {
         )
       }
     >
+      {error && <div className="text-red-500 text-sm mb-4 text-center">{error}</div>}
       <ViewTransition viewKey={view}>
         {view === "sign-in" && (
           <SignInForm

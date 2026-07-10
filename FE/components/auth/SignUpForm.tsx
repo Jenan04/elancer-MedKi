@@ -64,7 +64,7 @@ export function SignUpForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
       <Field
         label="Full name"
         type="text"

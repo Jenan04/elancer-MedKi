@@ -10,7 +10,7 @@ import {
 import { PrimaryButton } from "./ui";
 
 const OTP_LENGTH = 6;
-const RESEND_SECONDS = 30;
+const RESEND_SECONDS = 60;
 
 export function OtpVerification({
   email,
