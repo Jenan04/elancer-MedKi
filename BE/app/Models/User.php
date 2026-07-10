@@ -10,8 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-// use Illuminate\Auth\MustVerifyEmail; 
-// use Laravel\Cabinet\HasApiTokens;
+
 
 #[Fillable(['name', 'email', 'slug', 'password', 'google_id', "email_verified_at"])]
 #[Hidden(['password', 'remember_token'])]

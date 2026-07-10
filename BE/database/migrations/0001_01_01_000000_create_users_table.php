@@ -16,10 +16,10 @@ return new class extends Migration
             $table->string('email')->unique();
 
             $table->string('name')->nullable();
-            $table->string('slug')->unique();
+            $table->string('slug')->nullable()->unique();
 
             $table->string('password')->nullable();
-            $table->string('google_id')->unique()->nullable();
+            $table->string('google_id')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
             
             $table->rememberToken();
