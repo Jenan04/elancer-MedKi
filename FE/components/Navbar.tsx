@@ -63,13 +63,13 @@ export default function Navbar() {
         {/* Action Button */}
         <div className="flex items-center gap-4">
           <a
-            href="#demo"
+            href="/auth"
             className="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-[#1A1A1A]/20 hover:border-[#D44D44] rounded-md text-xs font-mono tracking-wider uppercase text-[#1A1A1A] hover:text-[#D44D44] transition-all duration-300 hover:bg-[#D44D44]/5"
           >
             Launch app
           </a>
           <a
-            href="#convert"
+            href="/auth?view=sign-up"
             className="inline-flex items-center justify-center px-4.5 py-2.5 bg-[#D44D44] hover:bg-[#D44D44]/95 text-white font-grotesk text-sm font-semibold rounded-md shadow-sm transition-all duration-300 hover:shadow-md active:scale-98"
           >
             Get Started
