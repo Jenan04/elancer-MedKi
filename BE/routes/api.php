@@ -3,6 +3,7 @@
 use App\Http\Controllers\auth\LoginController;
 use App\Http\Controllers\auth\RegisterController;
 use App\Http\Controllers\auth\VerificationController;
+use App\Http\Controllers\OauthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -17,4 +18,7 @@ Route::prefix('auth')->group(function () {
    
     Route::post('/verify-otp', [VerificationController::class, 'verifyOtp']);
     Route::post('/resend-otp', [VerificationController::class, 'resendOtp']);
+
+    Route::get('/google/redirect', [OauthController::class, 'redirectUrl']);
+    Route::post('/google/callback', [OauthController::class, 'callback']);
 });
