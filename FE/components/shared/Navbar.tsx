@@ -17,26 +17,25 @@ export default function Navbar({ onLogout }: NavbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { user, isAuth } = useAuthUser(); // ← replaces all props
+  const { user, isAuth, isLoading } = useAuthUser(); // ← replaces all props
 
   const logout = useLogout();
 
   // const hasToken = !!Cookies.get('medki_token');
-    const [hasToken, setHasToken] = useState(false);
+    // const [hasToken, setHasToken] = useState(false);
+  const [hasToken] = useState(() => !!Cookies.get('medki_token'));
 
   
   // ✅ إذا في token أو isAuth — اعتبره auth
   // const showAuthNav = isAuth || hasToken;
   
 
-  // ✅ Restored: scroll effect
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 30);
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // ✅ Restored: click outside closes dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -45,7 +44,6 @@ export default function Navbar({ onLogout }: NavbarProps) {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-    setHasToken(!!Cookies.get('medki_token'));
   }, []);
 
   const showAuthNav = isAuth || hasToken;
@@ -61,7 +59,6 @@ export default function Navbar({ onLogout }: NavbarProps) {
   };
 
   
-  // ✅ Restored: nav link arrays
   const guestLinks = [
     { name: "Home", href: "/#" },
     { name: "Flashcards", href: "/#flashcards" },
@@ -76,9 +73,8 @@ export default function Navbar({ onLogout }: NavbarProps) {
     { name: "Profile", href: "/profile" },
   ];
 
-  //  Restored: derived from hook's isAuth now, not props
   const currentLinks = showAuthNav ? authLinks : guestLinks;
-
+if (isLoading) return <NavbarSkeleton />;
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 w-full ${
@@ -247,6 +243,52 @@ export default function Navbar({ onLogout }: NavbarProps) {
             </>
           )}
         </div>
+      </nav>
+    </header>
+  );
+}
+
+function NavbarSkeleton() {
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 py-6 w-full">
+      <nav className="max-w-7xl mx-auto flex justify-between items-center px-6 md:px-10">
+
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-md bg-[#1A1A1A] flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-[#D44D44]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+          <span className="font-caslon text-2xl font-bold tracking-tight text-[#1A1A1A]">
+            med<span className="text-[#D44D44]">ki</span>
+          </span>
+        </div>
+
+        <div className="hidden md:flex items-center gap-8">
+          {[44, 76, 38, 52].map((w, i) => (
+            <div
+              key={i}
+              className="h-3.5 bg-[#A89F91]/30 rounded animate-pulse"
+              style={{ width: w, animationDelay: `${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div
+            className="h-6 w-12 bg-[#A89F91]/30 rounded-full animate-pulse"
+            style={{ animationDelay: '0.1s' }}
+          />
+          <div
+            className="h-5 w-5 bg-[#A89F91]/30 rounded animate-pulse"
+            style={{ animationDelay: '0.2s' }}
+          />
+          <div
+            className="w-8 h-8 rounded-full bg-[#A89F91]/30 animate-pulse"
+            style={{ animationDelay: '0.3s' }}
+          />
+        </div>
+
       </nav>
     </header>
   );

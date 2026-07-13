@@ -41,10 +41,13 @@ class UnauthenticatedError extends Error {
 }
 
 export function useAuthUser() {
+  const hasToken = !!Cookies.get('medki_token');
+
   const query = useQuery({
     queryKey: AUTH_USER_QUERY_KEY,
     queryFn: fetchNavbarUser,
     staleTime: 1000 * 60 * 5,
+    enabled: hasToken,
     retry: (failureCount, error) => {
       if (error instanceof UnauthenticatedError) return false;
       return failureCount < 1;
@@ -59,5 +62,9 @@ export function useAuthUser() {
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError && !isUnauthenticated,
+
+    // isLoading: hasToken ? query.isPending : false,
+    // isFetching: query.isFetching,
+    // isError: query.isError && !isUnauthenticated,
   };
 }
