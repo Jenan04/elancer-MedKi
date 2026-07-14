@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Navbar from "@/components/Navbar";
+import Navbar from "@/components/shared/Navbar";
 import ScrollVideoSection from "@/components/ScrollVideoSection";
 import FeaturesSection from "@/components/FeaturesSection";
 import InteractiveDemo from "@/components/InteractiveDemo";
@@ -9,23 +9,16 @@ import InteractiveDemo from "@/components/InteractiveDemo";
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-[#F5F2ED] selection:bg-[#D44D44] selection:text-white">
-      {/* Sticky Glassmorphic Navbar */}
       <Navbar />
 
-      {/* Main Content Sections */}
       <main className="flex-1">
-        {/* Scroll-Driven Video & Hero Section */}
         <ScrollVideoSection />
 
-        {/* 3 Pillars Feature Showcase */}
         <FeaturesSection />
 
-        {/* Live Interactive Parser Sandbox */}
         <InteractiveDemo />
 
-        {/* Contact & Support CTA */}
         <section id="contact" className="py-20 bg-[#1A1A1A] text-[#F5F2ED] relative overflow-hidden">
-          {/* Subtle clinical cross element in background */}
           <div className="absolute -right-16 -bottom-16 w-80 h-80 opacity-5 pointer-events-none">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 4v16m8-8H4" />
@@ -58,12 +51,10 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Premium Clinical Footer */}
       <footer className="bg-[#1A1A1A] text-[#F5F2ED]/50 font-grotesk text-xs border-t border-[#F5F2ED]/10 py-12">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-8 pb-8 border-b border-[#F5F2ED]/10">
             
-            {/* Left brand details */}
             <div className="md:col-span-6 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center w-6 h-6 rounded bg-[#F5F2ED]/15 text-[#D44D44]">
@@ -80,7 +71,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Links columns */}
             <div className="md:col-span-3 space-y-2">
               <h4 className="font-mono text-[9px] text-[#F5F2ED] tracking-widest uppercase font-bold">
                 Platform Utilities
@@ -115,7 +105,6 @@ export default function Home() {
 
           </div>
 
-          {/* Bottom attribution */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px]">
             <span>
               &copy; {new Date().getFullYear()} medki. All rights reserved. Built for future physicians.

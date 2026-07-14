@@ -72,9 +72,15 @@ function AuthFlowInner() {
   }
 
   const handleAuthSuccess = (token: string, user: UserInfo) => {
-    Cookies.set("medki_token", token, { expires: 7, secure: true, sameSite: "strict" });
-    localStorage.setItem("user_info", JSON.stringify(user));
-    router.push("/dashboard");
+    Cookies.set("medki_token", token, { 
+      expires: 7, 
+      secure: true, 
+      sameSite: "strict" 
+    });
+    // localStorage.setItem("user_info", JSON.stringify(user));
+    // localStorage.setItem('auth_token', token);
+
+    router.push("/decks");
   };
 
   async function handleSignIn(data: { email: string; password: string }) {
@@ -252,12 +258,11 @@ async function handleGoogleAuth() {
       "width=500,height=600,scrollbars=yes,resizable=yes"
     );
 
-    // استنى رسالة من الـ callback page
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
 
       if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
-        const { token, user } = event.data;
+        const { token } = event.data;
 
         Cookies.set("medki_token", token, {
           expires: 7,
@@ -265,9 +270,9 @@ async function handleGoogleAuth() {
           sameSite: "strict",
         });
 
-        localStorage.setItem("user_info", JSON.stringify(user));
+        // localStorage.setItem("user_info", JSON.stringify(user));
         popup?.close();
-        router.push("/dashboard");
+        router.push("/decks");
       }
 
       if (event.data.type === "GOOGLE_AUTH_ERROR") {
