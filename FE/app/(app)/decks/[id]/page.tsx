@@ -1,55 +1,78 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useAuthUser } from '@/hooks/useAuthUser';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
-
-interface Card {
-  id: string;
-  front: string;
-  back: string;
-}
+import { toast } from 'sonner';
 
 interface DeckDetails {
   id: string;
   title: string;
   description: string;
-  cards: Card[];
+  user_id: string; 
+  creator?: {
+    name: string;
+  };
+  is_subscribed: boolean; 
+  cards: any[];
 }
 
-export default function DeckDetailsPage() {
-  const { id: deckId } = useParams();
-  const queryClient = useQueryClient();
-  
+export default function DeckViewPage() {
+  const { id } = useParams(); 
+  const { user, isLoading: isUserLoading } = useAuthUser();
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
-  
   const [cardFront, setCardFront] = useState('');
   const [cardBack, setCardBack] = useState('');
-  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
-  const token = Cookies.get('medki_token');
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
-  const { data: deckResponse, isLoading } = useQuery<{ data: DeckDetails }>({
-    queryKey: ['deck', deckId],
+  const { data: deck, isLoading: isDeckLoading } = useQuery<DeckDetails>({
+    queryKey: ['deck', id],
     queryFn: async () => {
-      const res = await fetch(`${baseUrl}/decks/${deckId}`, {
+      const token = Cookies.get('medki_token');
+      const res = await fetch(`${baseUrl}/decks/${id}`, {
         headers: {
           'Accept': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      if (!res.ok) throw new Error('Failed to fetch deck details');
+      if (!res.ok) throw new Error('Failed to load deck');
+      return (await res.json()).data;
+    },
+    enabled: !!user,
+  });
+
+  const subscribeMutation = useMutation({
+    mutationFn: async () => {
+      const token = Cookies.get('medki_token');
+      const res = await fetch(`${baseUrl}/decks/${id}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error('Subscription failed');
       return res.json();
     },
-    enabled: !!deckId,
+    onSuccess: () => {
+      toast.success('Deck added to your study list successfully!');
+      queryClient.invalidateQueries({ queryKey: ['deck', id] });
+      queryClient.invalidateQueries({ queryKey: ['decks'] }); 
+    },
+    onError: () => {
+      toast.error('Something went wrong. Could not subscribe.');
+    }
   });
 
   const addCardMutation = useMutation({
     mutationFn: async (newCard: { front: string; back: string }) => {
-      const res = await fetch(`${baseUrl}/decks/${deckId}/cards`, {
+      const token = Cookies.get('medki_token'); 
+      const res = await fetch(`${baseUrl}/decks/${id}/cards`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,33 +85,14 @@ export default function DeckDetailsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deck', deckId] });
+      toast.success('Card added successfully!');
+      queryClient.invalidateQueries({ queryKey: ['deck', id] }); 
       setIsManualModalOpen(false);
       setCardFront('');
       setCardBack('');
-    }
-  });
-
-  const uploadCsvMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('file', file); 
-
-      const res = await fetch(`${baseUrl}/decks/${deckId}/cards/import`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-        body: formData,
-      });
-      if (!res.ok) throw new Error('Failed to import CSV');
-      return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deck', deckId] });
-      setIsCsvModalOpen(false);
-      setCsvFile(null);
+    onError: () => {
+      toast.error('Failed to add the card. Please try again.');
     }
   });
 
@@ -98,73 +102,84 @@ export default function DeckDetailsPage() {
     addCardMutation.mutate({ front: cardFront, back: cardBack });
   };
 
-  const handleCsvSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!csvFile) return;
-    uploadCsvMutation.mutate(csvFile);
-  };
+  if (isUserLoading || isDeckLoading) return <p className="p-8 text-center">Loading deck...</p>;
+  if (!deck) return <p className="p-8 text-center">Deck not found.</p>;
 
-  if (isLoading) return <div className="p-8 text-center">Loading deck...</div>;
-
-  const deck = deckResponse?.data;
-  const cards = deck?.cards || [];
+  const isOwner = deck.user_id === user?.id;
 
   return (
-    <div className="space-y-8 p-6 max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-[#A89F91]/20">
+    <div className="max-w-3xl mx-auto space-y-8 p-6 bg-[#F5F2ED] border border-[#A89F91]/30 rounded-2xl mt-10">
+      
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-[#A89F91]/20 pb-6 gap-4">
         <div>
-          <h1 className="font-caslon text-3xl font-bold text-[#1A1A1A]">{deck?.title}</h1>
-          <p className="font-grotesk text-sm text-[#1A1A1A]/60 mt-1">{deck?.description}</p>
+          <h1 className="font-caslon text-3xl font-bold text-[#1A1A1A]">{deck.title}</h1>
+          <p className="font-grotesk text-sm text-[#1A1A1A]/60 mt-1">{deck.description || 'No description provided.'}</p>
         </div>
-        
-        <div className="flex flex-wrap gap-3">
-          <button 
-            onClick={() => setIsManualModalOpen(true)}
-            className="px-4 py-2 bg-[#1A1A1A] text-white hover:bg-[#D44D44] rounded-full text-xs font-bold font-grotesk transition-colors duration-200 flex items-center gap-2"
-          >
-            ➕ Add Card
-          </button>
-          
-          <button 
-            onClick={() => setIsCsvModalOpen(true)}
-            className="px-4 py-2 bg-[#F5F2ED] text-[#1A1A1A] border border-[#A89F91]/40 hover:border-[#D44D44] rounded-full text-xs font-bold font-grotesk transition-colors duration-200 flex items-center gap-2"
-          >
-            📤 Import CSV
-          </button>
+
+        <div className="flex items-center gap-3">
+          {isOwner ? (
+            <>
+              <button 
+                onClick={() => setIsManualModalOpen(true)}
+                className="px-4 py-2 bg-[#1A1A1A] text-white hover:bg-[#D44D44] rounded-full text-xs font-bold font-grotesk transition-colors duration-200 flex items-center gap-2 cursor-pointer"
+              >
+                ➕ Add Card
+              </button>
+              <button 
+                onClick={() => router.push(`/decks/${deck.id}/study`)}
+                className="px-4 py-2 bg-[#D44D44] text-white rounded-xl text-xs font-bold font-grotesk hover:bg-[#D44D44]/90 transition-colors cursor-pointer"
+              >
+                📚 Study
+              </button>
+            </>
+          ) : (
+            <>
+              {!deck.is_subscribed ? (
+                <button 
+                  onClick={() => subscribeMutation.mutate()}
+                  disabled={subscribeMutation.isPending}
+                  className="px-5 py-2.5 bg-[#D44D44] text-white rounded-xl text-xs font-bold font-grotesk hover:bg-[#D44D44]/90 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-xs cursor-pointer"
+                >
+                  📥 {subscribeMutation.isPending ? 'Adding...' : 'Add to My Decks'}
+                </button>
+              ) : (
+                <button 
+                  onClick={() => router.push(`/decks/${deck.id}/study`)}
+                  className="px-5 py-2.5 bg-[#1A1A1A] text-white rounded-xl text-xs font-bold font-grotesk hover:bg-[#1A1A1A]/90 transition-colors cursor-pointer"
+                >
+                  📖 Study This Deck
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      <div>
-        <h2 className="font-caslon text-xl font-bold text-[#1A1A1A] mb-4">Flashcards ({cards.length})</h2>
-        
-        {cards.length === 0 ? (
-          <div className="border-2 border-dashed border-[#A89F91]/30 rounded-2xl p-12 text-center text-[#1A1A1A]/50">
-            No cards in this deck yet. Click "Add Card" or upload a CSV to start.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cards.map((card) => (
-              <div key={card.id} className="bg-[#F5F2ED] border border-[#A89F91]/30 rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-                <div>
-                  <span className="text-[9px] font-mono uppercase tracking-wider text-[#1A1A1A]/40 block mb-1">Front</span>
-                  <p className="font-grotesk text-sm font-bold text-[#1A1A1A]">{card.front}</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-[#A89F91]/15">
-                  <span className="text-[9px] font-mono uppercase tracking-wider text-[#D44D44] block mb-1">Back / Answer</span>
-                  <p className="font-grotesk text-xs text-[#1A1A1A]/80">{card.back}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <h2 className="font-caslon text-xl font-bold text-[#1A1A1A]">Flashcards ({deck.cards?.length || 0})</h2>
+        <div className="grid grid-cols-1 gap-3">
+          {deck.cards?.map((card, idx) => (
+            <div key={card.id} className="p-4 bg-[#1A1A1A]/5 rounded-xl border border-[#A89F91]/20">
+              <p className="font-mono text-[11px] text-[#1A1A1A]/40 mb-1">Card #{idx + 1}</p>
+              <p className="font-grotesk text-sm font-semibold text-[#1A1A1A]">{card.front}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-6 border-t border-[#A89F91]/20 flex justify-between items-center text-xs font-mono text-[#1A1A1A]/40">
+        <span>Created by: {isOwner ? 'Me' : (deck.creator?.name || 'Shared User')}</span>
+        {!isOwner && deck.is_subscribed && (
+          <span className="text-emerald-600 font-semibold">✓ Saved in your account</span>
         )}
       </div>
 
       {isManualModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A1A]/40 backdrop-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A1A]/40 backdrop-blur-sm">
           <div className="bg-[#F5F2ED] border border-[#A89F91]/30 w-full max-w-md mx-4 rounded-2xl p-6 shadow-2xl">
             <div className="flex justify-between items-center pb-3 border-b border-[#A89F91]/15">
               <h3 className="font-caslon text-lg font-bold">Add New Flashcard</h3>
-              <button onClick={() => setIsManualModalOpen(false)} className="text-sm font-mono">✕</button>
+              <button onClick={() => setIsManualModalOpen(false)} className="text-sm font-mono cursor-pointer">✕</button>
             </div>
             <form onSubmit={handleManualSubmit} className="mt-4 space-y-4">
               <div>
@@ -193,7 +208,7 @@ export default function DeckDetailsPage() {
                 <button 
                   type="submit" 
                   disabled={addCardMutation.isPending}
-                  className="px-5 py-2 bg-[#D44D44] text-white rounded-full text-xs font-bold disabled:opacity-50"
+                  className="px-5 py-2 bg-[#D44D44] text-white rounded-full text-xs font-bold disabled:opacity-50 cursor-pointer"
                 >
                   {addCardMutation.isPending ? 'Saving...' : 'Add Card'}
                 </button>
@@ -201,42 +216,7 @@ export default function DeckDetailsPage() {
             </form>
           </div>
         </div>
-      )}
-
-      {isCsvModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A1A]/40 backdrop-sm">
-          <div className="bg-[#F5F2ED] border border-[#A89F91]/30 w-full max-w-md mx-4 rounded-2xl p-6 shadow-2xl">
-            <div className="flex justify-between items-center pb-3 border-b border-[#A89F91]/15">
-              <h3 className="font-caslon text-lg font-bold">Import Cards via CSV</h3>
-              <button onClick={() => setIsCsvModalOpen(false)} className="text-sm font-mono">✕</button>
-            </div>
-            <form onSubmit={handleCsvSubmit} className="mt-4 space-y-4">
-              <div className="p-6 border-2 border-dashed border-[#A89F91]/40 rounded-xl bg-[#1A1A1A]/[0.02] text-center">
-                <input 
-                  type="file" 
-                  accept=".csv"
-                  required
-                  onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
-                  className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#1A1A1A] file:text-white hover:file:bg-[#D44D44] cursor-pointer"
-                />
-                <p className="text-[11px] text-[#1A1A1A]/40 mt-3 font-mono">
-                  Make sure your CSV has columns: <span className="font-bold text-[#D44D44]">front, back</span>
-                </p>
-              </div>
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#A89F91]/15">
-                <button 
-                  type="submit" 
-                  disabled={uploadCsvMutation.isPending}
-                  className="px-5 py-2 bg-[#1A1A1A] text-white hover:bg-[#D44D44] rounded-full text-xs font-bold disabled:opacity-50"
-                >
-                  {uploadCsvMutation.isPending ? 'Importing...' : 'Upload File'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      )}  
     </div>
   );
 }

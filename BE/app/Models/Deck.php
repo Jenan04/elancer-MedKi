@@ -37,8 +37,9 @@ class Deck extends Model
             // when i need to return any timestimpe from pivot tbls i won't be able to read them only in string format so `using` that makes me able to make catsing
             // Using an anonymous Pivot class allows us to cast the custom 'deadline' pivot field 
             // into a native Carbon object instead of receiving it as a raw string.
-            ->using(new class extends Pivot {
-            protected $casts = ['deadline' => 'datetime'];
-        });
+        //     ->using(new class extends Pivot {
+        //     protected $casts = ['deadline' => 'datetime'];
+        // });
+        ->using(DeckUser::class);
     }
 }

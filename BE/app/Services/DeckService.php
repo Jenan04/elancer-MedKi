@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Deck;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -110,4 +111,20 @@ class DeckService
             }
         }
     }
+
+    public function updateSubscriberDeadline(Deck $deck, string $deadline): void
+    {
+        // $user = auth()->user();
+
+        // $user->subscribedDecks()->updateExistingPivot($deck->id, [
+        //     'deadline' => $deadline
+        // ]);
+        $user = Auth::user();
+
+        if ($user instanceof User) {
+            $user->subscribedDecks()->updateExistingPivot($deck->id, [
+                'deadline' => $deadline
+            ]);
+    }
+}
 }

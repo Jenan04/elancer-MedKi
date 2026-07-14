@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\auth\LoginController;
 use App\Http\Controllers\auth\RegisterController;
 use App\Http\Controllers\auth\VerificationController;
+use App\Http\Controllers\CardRatingController;
 use App\Http\Controllers\OauthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -12,13 +13,19 @@ use Illuminate\Support\Facades\Route;
 // Route::get('/user/navbar', [UserController::class, 'navbarData'])->middleware('auth:sanctum');
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/navbar', [UserController::class, 'navbarData']);
-    // راوتس الـ CRUD الكاملة للـ Decks
+
+
+    Route::post('/cards/{card}/rate', [CardRatingController::class, 'rate']);
+    
     Route::post('decks/{deck}/cards', [DeckController::class, 'addCard']);
     Route::post('decks/{deck}/cards/import', [DeckController::class, 'importCsv']);
     
+    Route::post('/decks/{deck}/subscribe', [DeckController::class, 'subscribe']);
+    
+    Route::put('/decks/{deck}/deadline', [DeckController::class, 'updateDeadline']);
+    
     Route::apiResource('decks', DeckController::class);
     
-    // راوت مخصص للاشتراك في ديسك مشترك من يوزر آخر
     Route::post('decks/{deck}/subscribe', [DeckController::class, 'subscribe']);
 });
 

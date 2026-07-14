@@ -15,7 +15,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 
-#[Fillable(['name', 'email', 'slug', 'password', 'google_id', "email_verified_at"])]
+#[Fillable(['name', 'email', 'slug', 'password', 'google_id', 'email_verified_at', 'streak_count','last_studied_at',])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -32,6 +32,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'last_studied_at' => 'datetime',
         ];
     }
 
@@ -46,8 +47,9 @@ public function subscribedDecks(): BelongsToMany
     return $this->belongsToMany(Deck::class, 'deck_user')
         ->withPivot('deadline')
         ->withTimestamps()
-        ->using(new class extends Pivot {
-            protected $casts = ['deadline' => 'datetime'];
-        });
+        // ->using(new class extends Pivot {
+        //     protected $casts = ['deadline' => 'datetime'];
+        // });
+        ->using(DeckUser::class);
 }
 }

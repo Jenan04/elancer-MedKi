@@ -39,10 +39,51 @@ class DeckController extends Controller
 
     public function show(Deck $deck): JsonResponse
     {
-        return Response::json([
-            'data' => $deck->loadCount('cards')->load(['creator', 'cards'])
+
+        $userId = auth()->id(); 
+        $deck->loadCount('cards')->load([
+            'creator', 
+            'cards.usersProgress' => function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            }
         ]);
+
+
+    $cardsTransformed = $deck->cards->map(function ($card) {
+        $progress = $card->usersProgress->first();
+
+        return [
+            'id' => $card->id,
+            'front' => $card->front,
+            'back' => $card->back,
+            'userRating' => $progress ? $this->getRatingLabelFromBoxLevel($progress->pivot->box_level) : null,
+            'due_at' => $progress ? $progress->pivot->due_at : null,
+        ];
+    });
+
+    return Response::json([
+        'data' => [
+            'id' => $deck->id,
+            'user_id' => $deck->user_id,
+            'title' => $deck->title,
+            'description' => $deck->description,
+            'deadline' => $deck->deadline,
+            'creator' => $deck->creator,
+            'cards_count' => $deck->cards_count,
+            'cards' => $cardsTransformed 
+        ]
+    ]);
     }
+
+private function getRatingLabelFromBoxLevel(int $boxLevel): string
+{
+    return match ($boxLevel) {
+        1 => 'again',
+        2 => 'hard',
+        3 => 'good',
+        default => 'easy', 
+    };
+}
 
     public function update(Request $request, Deck $deck): JsonResponse
     {
@@ -84,6 +125,18 @@ class DeckController extends Controller
     }
 
 
+    public function updateDeadline(Request $request, Deck $deck): JsonResponse
+    {
+        $validated = $request->validate([
+            'deadline' => 'required|date|after:now',
+        ]);
+
+        $this->deckService->updateSubscriberDeadline($deck, $validated['deadline']);
+
+        return Response::json([
+            'message' => 'Deadline updated successfully for this deck.'
+        ]);
+    }
     public function addCard(Request $request, Deck $deck): JsonResponse
     {
         if ($request->user()->id !== $deck->user_id) {
