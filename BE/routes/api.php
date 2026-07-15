@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\DeckController;
+use App\Http\Controllers\Api\FileUploadController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\auth\LoginController;
 use App\Http\Controllers\auth\RegisterController;
@@ -26,7 +27,15 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::apiResource('decks', DeckController::class);
     
-    Route::post('decks/{deck}/subscribe', [DeckController::class, 'subscribe']);
+    // Route::post('decks/{deck}/subscribe', [DeckController::class, 'subscribe']);
+
+    Route::post('/files/upload', [FileUploadController::class, 'uploadGeneric']);
+    Route::get('/files', [FileUploadController::class, 'index']);
+    
+    Route::get('/files/{file}', [FileUploadController::class, 'show']);
+    
+    Route::post('/files/{file}/convert', [FileUploadController::class, 'convert']);
+
 });
 
 
@@ -41,3 +50,5 @@ Route::prefix('auth')->group(function () {
     Route::get('/google/redirect', [OauthController::class, 'redirectUrl']);
     Route::post('/google/callback', [OauthController::class, 'callback']);
 });
+
+Route::get('/files/{file}/download', [FileUploadController::class, 'download']);

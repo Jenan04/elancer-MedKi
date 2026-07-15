@@ -52,4 +52,9 @@ public function subscribedDecks(): BelongsToMany
         // });
         ->using(DeckUser::class);
 }
+
+    public function uploadedFiles(): HasMany
+    {
+        return $this->hasMany(UploadFile::class);
+    }
 }
