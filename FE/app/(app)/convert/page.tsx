@@ -98,7 +98,7 @@ export default function ConvertFilePage() {
     return () => stopPolling();
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -112,63 +112,113 @@ export default function ConvertFilePage() {
     setUploadStatus('uploading');
     const toastId = toast.loading('Preparing upload sequence...');
 
-    const token = Cookies.get('medki_token');
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      const token = Cookies.get('medki_token');
 
-    const xhr = new XMLHttpRequest();
-    
-    xhr.open('POST', `${baseUrl}/files/upload`);
-    xhr.setRequestHeader('Accept', 'application/json');
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    }
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percentComplete = Math.round((event.loaded / event.total) * 100);
-        setUploadProgress(percentComplete);
-        
-        if (percentComplete < 100) {
-          toast.loading(`Uploading to server: ${percentComplete}%`, { id: toastId });
-        } else {
-          setUploadStatus('cloudinary');
-          toast.loading('File received! Syncing with Cloudinary...', { id: toastId });
+      // 1. Fetch Cloudinary signature from Laravel (Strictly a text-based payload request)
+      const sigResponse = await fetch(`${baseUrl}/cloudinary/signature`, {
+        headers: {
+          'Accept': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         }
+      });
+      
+      // if (!sigResponse.ok) {
+      //   throw new Error('Unable to retrieve secure upload signature.');
+      // }
+      
+      if (!sigResponse.ok) {
+        const errorText = await sigResponse.text();
+        console.error("🔴 Laravel Signature Error Details:", errorText);
+        throw new Error(`Signature failed: ${sigResponse.status} ${sigResponse.statusText}`);
       }
-    };
+      const signData = await sigResponse.json();
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const json = JSON.parse(xhr.responseText);
-          const uploadedFile: UploadedFile = json.file || json.data;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', signData.api_key);
+      formData.append('timestamp', signData.timestamp.toString());
+      formData.append('signature', signData.signature);
+      formData.append('folder', 'medki_documents');
 
-          setUploadStatus('success');
-          toast.success('File successfully uploaded to Cloudinary! ☁️✨', { id: toastId });
+      // 3. POST directly to Cloudinary API (All bandwidth consumed goes from user straight to CDN)
+      toast.loading('Uploading file directly to Cloudinary...', { id: toastId });
+      
+      const xhr = new XMLHttpRequest();
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signData.cloud_name}/raw/upload`;
+      
+      xhr.open('POST', cloudinaryUrl);
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
           
-          queryClient.invalidateQueries({ queryKey: ['uploaded-files'] });
-          setSelectedFileId(uploadedFile.id);
-          setActiveFile(uploadedFile);
-        } catch (err) {
-          setUploadStatus('idle');
-          toast.error('Error reading response from server.', { id: toastId });
+          if (percentComplete < 100) {
+            toast.loading(`Direct CDN Upload: ${percentComplete}%`, { id: toastId });
+          } else {
+            setUploadStatus('cloudinary');
+            toast.loading('Processing with media CDN...', { id: toastId });
+          }
         }
-      } else {
-        setUploadStatus('idle');
-        toast.error('Upload failed. Please check backend logs.', { id: toastId });
+      };
+
+      const uploadPromise = new Promise<{ secure_url: string }>((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const json = JSON.parse(xhr.responseText);
+              resolve(json);
+            } catch (err) {
+              reject(new Error('Failed to parse Cloudinary response.'));
+            }
+          } else {
+            reject(new Error(`Cloudinary upload failed with status ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during Cloudinary upload.'));
+      });
+
+      xhr.send(formData);
+      const uploadResult = await uploadPromise;
+
+      // 4. Send ONLY the resulting URL and metadata to Laravel
+      toast.loading('Registering file in database...', { id: toastId });
+      const regResponse = await fetch(`${baseUrl}/documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          file_url: uploadResult.secure_url,
+          file_name: file.name,
+          file_size: file.size,
+        }),
+      });
+
+      if (!regResponse.ok) {
+        throw new Error('Failed to register file on server.');
       }
-      setIsUploading(false);
-    };
 
-    xhr.onerror = () => {
-      setIsUploading(false);
+      const regJson = await regResponse.json();
+      const uploadedFile: UploadedFile = regJson.file || regJson.data;
+
+      setUploadStatus('success');
+      toast.success('Uploaded and registered successfully! ☁️✨', { id: toastId });
+
+      queryClient.invalidateQueries({ queryKey: ['uploaded-files'] });
+      setSelectedFileId(uploadedFile.id);
+      setActiveFile(uploadedFile);
+
+    } catch (err: any) {
       setUploadStatus('idle');
-      toast.error('Network connection error.', { id: toastId });
-    };
-
-    xhr.send(formData);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      toast.error(err.message || 'An unexpected error occurred during upload.', { id: toastId });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const convertMutation = useMutation({
@@ -231,7 +281,7 @@ export default function ConvertFilePage() {
             ref={fileInputRef} 
             onChange={handleFileUpload} 
             className="hidden" 
-            accept=".pdf,.txt,.md,.csv,.json"
+            accept=".pdf,.txt,.md,.csv,.json, .pptx, .ppt, .docx, .doc"
             disabled={isUploading || convertMutation.isPending || isPolling}
           />
           
