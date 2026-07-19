@@ -173,4 +173,42 @@ private function getRatingLabelFromBoxLevel(int $boxLevel): string
             'message' => 'CSV imported successfully'
         ]);
     }
+
+    public function importFromUrl(Request $request, Deck $deck): JsonResponse
+    {
+        if ($request->user()->id !== $deck->user_id) {
+            return Response::json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'file_url' => 'required_without:file_id|url',
+            'file_id' => 'required_without:file_url|exists:upload_files,id'
+        ]);
+
+        $fileUrl = $request->input('file_url');
+
+        if (!$fileUrl && $request->has('file_id')) {
+            $uploadFile = \App\Models\UploadFile::find($request->input('file_id'));
+            
+            if ($uploadFile->user_id !== $request->user()->id) {
+                return Response::json(['message' => 'Unauthorized access to file'], 403);
+            }
+
+            $fileUrl = $uploadFile->csv_file_url;
+
+            if (!$fileUrl) {
+                return Response::json(['message' => 'File is not ready for import.'], 400);
+            }
+        }
+
+        try {
+            $this->deckService->importFromUrlToDeck($deck, $fileUrl);
+        } catch (\Exception $e) {
+            return Response::json(['message' => $e->getMessage()], 500);
+        }
+
+        return Response::json([
+            'message' => 'Flashcards imported successfully from Library'
+        ]);
+    }
 }

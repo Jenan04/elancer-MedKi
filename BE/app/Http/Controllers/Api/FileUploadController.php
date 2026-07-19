@@ -8,6 +8,8 @@ use App\Models\UploadFile;
 use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class FileUploadController extends Controller
@@ -65,13 +67,32 @@ class FileUploadController extends Controller
     return response()->json(['files' => $files]);
 }
 
+    public function userFiles()
+    {
+        $files = UploadFile::where('user_id', Auth::id())
+            ->where('status', 'completed')
+            ->whereNotNull('csv_file_url')
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'original_name', 'csv_file_url']);
+
+        $data = $files->map(function ($file) {
+            $csvName = pathinfo($file->original_name, PATHINFO_FILENAME) . '.csv';
+            return [
+                'id' => $file->id,
+                'file_name' => $csvName,
+                'url' => $file->csv_file_url,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
 public function show(UploadFile $file)
 {
     abort_if($file->user_id !== Auth::id(), 403);
     return response()->json(['file' => $file]);
 }
 
-// تعديل دالة الـ download لتسمح بمرور الـ Token في الـ Query Parameter
 public function download(Request $request, UploadFile $file)
 {
     if (!Auth::check() && $request->has('token')) {
@@ -84,9 +105,25 @@ public function download(Request $request, UploadFile $file)
     abort_if(!Auth::check() || $file->user_id !== Auth::id(), 403);
     abort_if(!$file->csv_file_url, 404, 'CSV not ready');
 
-    $contents = file_get_contents($file->csv_file_url);
 
-    return response($contents, 200, [
+
+    try {
+    $response = Http::withHeaders([
+        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    ])
+    ->timeout(30) 
+    ->get($file->csv_file_url);
+
+    if ($response->failed()) {
+        abort(500, 'Failed to fetch the file from Cloudinary storage.');
+    }
+
+    $contents = $response->body();
+} catch (\Exception $e) {
+    Log::error('Cloudinary download failed: ' . $e->getMessage());
+    abort(500, 'Connection to storage timed out.');
+}
+  return response($contents, 200, [
         'Content-Type'        => 'text/csv',
         'Content-Disposition' => 'attachment; filename="' . pathinfo($file->original_name, PATHINFO_FILENAME) . '.csv"',
     ]);
@@ -129,4 +166,29 @@ public function uploadGeneric(Request $request)
         ], 500);
     }
 }
+
+public function registerDocument(Request $request)
+{
+    $request->validate([
+        'file_url' => 'required|url',
+        'file_name' => 'required|string',
+        'file_size' => 'required|integer',
+    ]);
+
+    $uploadedFile = UploadFile::create([
+        'user_id'           => Auth::id(),
+        'deck_id'           => null,
+        'original_name'     => $request->input('file_name'),
+        'original_file_url' => $request->input('file_url'),
+        'extension'         => pathinfo($request->input('file_name'), PATHINFO_EXTENSION),
+        'status'            => 'uploaded',
+        'file_size'         => $request->input('file_size'),
+    ]);
+
+    return response()->json([
+        'message' => 'File registered successfully.',
+        'file'    => $uploadedFile
+    ], 201);
 }
+}
+

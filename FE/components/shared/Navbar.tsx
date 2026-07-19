@@ -17,17 +17,13 @@ export default function Navbar({ onLogout }: NavbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { user, isAuth, isLoading } = useAuthUser(); // ← replaces all props
+  const { user, isAuth, isLoading } = useAuthUser(); 
 
   const logout = useLogout();
 
-  // const hasToken = !!Cookies.get('medki_token');
-    // const [hasToken, setHasToken] = useState(false);
   const [hasToken] = useState(() => !!Cookies.get('medki_token'));
 
   
-  // ✅ إذا في token أو isAuth — اعتبره auth
-  // const showAuthNav = isAuth || hasToken;
   
 
   useEffect(() => {
@@ -44,6 +40,12 @@ export default function Navbar({ onLogout }: NavbarProps) {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   const showAuthNav = isAuth || hasToken;
@@ -74,7 +76,7 @@ export default function Navbar({ onLogout }: NavbarProps) {
   ];
 
   const currentLinks = showAuthNav ? authLinks : guestLinks;
-if (isLoading) return <NavbarSkeleton />;
+  if (!mounted || isLoading) return <NavbarSkeleton />;
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 w-full ${
