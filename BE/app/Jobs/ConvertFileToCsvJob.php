@@ -34,15 +34,33 @@ class ConvertFileToCsvJob implements ShouldQueue
             $ext  = strtolower(pathinfo($this->file->original_name, PATHINFO_EXTENSION));
             $text = $this->extractText($content, $ext);
 
+            $fileSize = strlen($content);
+            $isHeavy = ($fileSize > 3 * 1024 * 1024) || in_array($ext, ['pptx', 'ppt']);
+
+            $defaultModel = env('GEMINI_MODEL', 'gemini-3.1-flash-lite');
+            
+            $selectedModel = $isHeavy ? 'gemini-3.5-flash' : $defaultModel;
+
             $agent = new FlashcardConverterAgent();
-            $csv = (string) $agent->prompt("Convert the following content to flashcard CSV:\n\n" . $text);
+            $prompt = <<<PROMPT
+Analyze the entire document page-by-page. 
+Do NOT summarize, compress, or skip slides. 
+Provide a comprehensive, granular set of cards. For presentation decks with large slide counts, output a rich list (aiming for 25-45 highly specific Flashcards) capturing minor details, formulas, and distinct definitions.
+
+[INPUT TEXT TO CONVERT]:
+{$text}
+PROMPT;
+
+            $csv = (string) $agent->prompt($prompt, model: $selectedModel);
+            // $csv = (string) $agent->prompt("Convert the following content to flashcard CSV:\n\n" . $text);
 
             $csv = preg_replace('/^```[a-z]*\n?/m', '', $csv);$csv = trim(str_replace('```', '', $csv));
 
             $tmpPath = sys_get_temp_dir() . '/' . uniqid('csv_') . '.csv';
             file_put_contents($tmpPath, $csv);
 
-            $csvSecureUrl = $cloudinaryService->uploadFile($tmpPath, 'medki/csv');
+            $csvSecureUrl = $cloudinaryService->uploadFile($tmpPath, 'medki_csvs');
+
 
             if (file_exists($tmpPath)) {
                 unlink($tmpPath);

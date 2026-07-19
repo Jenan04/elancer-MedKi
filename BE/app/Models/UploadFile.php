@@ -16,7 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'extension',
     'csv_file_url',
     'status',
-    'error_message'
+    'error_message',
+    'file_size'
 )]
 class UploadFile extends Model
 {

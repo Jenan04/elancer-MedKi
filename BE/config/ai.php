@@ -95,7 +95,7 @@ return [
         'gemini' => [
             'driver' => 'gemini',
             'key' => env('GEMINI_API_KEY'),
-            'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'), // تحديد الموديل هنا
+            'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'), 
             'url' => env('GEMINI_URL', 'https://generativelanguage.googleapis.com/v1beta/'),
         ],
 

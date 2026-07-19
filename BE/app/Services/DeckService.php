@@ -112,13 +112,42 @@ class DeckService
         }
     }
 
+    public function importFromUrlToDeck(Deck $deck, string $fileUrl): void
+    {
+        $response = \Illuminate\Support\Facades\Http::timeout(30)->get($fileUrl);
+        
+        if ($response->failed()) {
+            throw new \Exception('Failed to fetch the file from the given URL.');
+        }
+
+        $stream = fopen('php://memory', 'r+');
+        fwrite($stream, $response->body());
+        rewind($stream);
+
+        fgetcsv($stream, 1000, ",");
+        
+        $cardsData = [];
+        
+        while (($data = fgetcsv($stream, 1000, ",")) !== FALSE) {
+            if (!empty($data[0]) && !empty($data[1])) {
+                $cardsData[] = [
+                    'front' => $data[0],
+                    'back' => $data[1],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+        fclose($stream);
+
+        if (!empty($cardsData)) {
+            $deck->cards()->createMany($cardsData);
+            $deck->increment('cards_count', count($cardsData));
+        }
+    }
+
     public function updateSubscriberDeadline(Deck $deck, string $deadline): void
     {
-        // $user = auth()->user();
-
-        // $user->subscribedDecks()->updateExistingPivot($deck->id, [
-        //     'deadline' => $deadline
-        // ]);
         $user = Auth::user();
 
         if ($user instanceof User) {
